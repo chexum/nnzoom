@@ -1,0 +1,265 @@
+#!/usr/bin/env python
+
+# Theory of operation:
+#
+# save gzip header from file to identify
+# re-compress uncompressed data
+# strip header for re-compressed data
+# add header from old compressed data
+
+# bzip2-1.0.6.tar.gz- gzip compressed data, was "bzip2-1.0.6.tar", from Unix, last modified: Mon Sep 20 08:15:13 2010
+# 0000000: 1f8b 0808 010a 974c 0003 627a 6970 322d  .......L..bzip2-
+# 0000010: 312e 302e 362e 7461 7200 ec3c 6b57 1b47  1.0.6.tar..<kW.G
+# 0000020: b2f9 7af9 156d 7292 6890 8435 2310 3832  ..z..mr.h..5#.82  
+#
+#          1f8b - id
+#               08 - deflate
+#                 02 - flags - has crc
+#                 04 - flags - extra field
+#                 08 - flags - (flags & 0xc == 0x8) => name present
+#                    010a 974c - ledate
+#                              00 (02: max compression, 04: max speed)
+#                                03 (03 = Unix)
+#                                   xx (zstring name if)
+
+# The GNU gzip output differs between 1.2.14 (up to at least 1.3.13) and 1.6 (from 1.5 at least)
+# All the --rsyncable output differs for each Ubuntu patch at least
+#
+# Event-0.51.tar.gz *gzip-1.2.4 -3 2a6fb837786dc6ebfe0325d92fd76710ec027a66 61260
+# Event-0.51.tar.gz *gzip-1.6   -3 a96abdc40ddf63649344150cb5c21330a637a216 61260 !
+# Event-0.51.tar.gz *gzip-1.2.4 -9 d29a06cf9fec8dd7d697713d1cfc23202c7d1ad2 55125
+# Event-0.51.tar.gz *gzip-1.6   -9 0598c87cddcde1910cf3be4169ddd43199fcb4be 55124
+
+import argparse
+import sys
+import tempfile
+import json,struct
+import zlib,hashlib
+import subprocess,os,shlex
+
+HASH_TYPE='md5'
+BUF_SIZE=64000
+
+parser = argparse.ArgumentParser(description='Identify compression.')
+parser.add_argument('files',nargs='+',type=str)
+args = parser.parse_args()
+
+# pass enough of buf for all the header please
+class gzHeader:
+  def __init__(self,buf):
+    self.len=None
+    self.raw=None
+    self.magic=None
+    self.method=None
+    self.flags=None
+    self.stamp=None
+    self.extraflags=None
+    self.ostype=None
+    self.extra=None
+    self.name=None
+    self.comment=None
+    self.hdrcrc=None
+    self.command=None
+    self.complevel="-6"
+
+    # minimum file length (10+crc+origsize)
+    if len(buf)<18:
+      return
+    (magic,cm,flg,mtime,xfl,ostype)=struct.unpack_from("<HBBLBB",buf)
+    # bytes 0x1f 0x8b (\037\213) with deflate (0x08)
+    # 40479 is old gzip 0.5 (\037\236) (freeze 1.x)
+    if magic==35615 and cm==8 and (flg&0xe0)==0:
+      self.magic = magic
+      self.method = cm
+      self.flags = flg
+      self.stamp = mtime
+      self.extraflags = xfl
+      self.ostype = ostype
+
+      self.len = 10
+      # FLG.FEXTRA - extra field presents, with le16 length
+      if (flg&4) != 0:
+        self.len += 2
+        extralen = struct.unpack_from("<H",buf[self.len:self.len+2])
+        self.extra = buf[self.len:self.len+extralen]
+        self.len += extralen
+      # FLG.FNAME - original file name, zero byte terminated
+      if (flg&8) != 0:
+        namelen = buf[self.len:].index(b'\0')
+        self.name = buf[self.len:self.len+namelen]
+        self.len += namelen+1
+      # FLG.FCOMMENT - comment, zero byte terminated
+      if (flg&16) != 0:
+        commentlen = buf[self.len:].index(b'\0')
+        self.comment = buf[self.len:self.len+commentlen]
+        self.len += commentlen+1
+      if (flg&4) != 0:
+        self.hdrcrc = struct.unpack_from("<H",buf[self.len:self.len+2])[0]
+        self.len += 2
+
+      self.command = "minigzip"
+      self.level = "-6"
+      if (self.extraflags&2)!=0: self.level = "-9"
+      if (self.extraflags&4)!=0: self.level = "-1"
+      self.raw = buf[:self.len]
+
+  def __repr__(self):
+    if self.magic:
+      return json.dumps({self.command:[
+        self.level,
+        self.magic,
+        self.method,self.flags,self.stamp,self.extraflags,self.ostype,
+        self.extra,self.name,self.comment,self.hdrcrc]})
+    return json.dumps(None)
+
+def retry_gz(gzhdr,unc_filename,target_hash,target_len,command="gzip",forced_level=None):
+  levels = ['-0','-1','-2','-3','-4','-5','-6','-7','-8','-9','-11','-i15','-mx=9 -md=32m']
+  level = gzhdr.level
+  min_index = 1
+  max_index = 9
+  if command[0:4] == "pigz": max_index = 10
+  prev_index = None
+  if forced_level: level = forced_level
+  else: level_index = levels.index(str(level))
+  if (gzhdr.extraflags&2)!=0: min_index = 9
+  else: max_index = 9
+  if (gzhdr.extraflags&4)!=0: max_index = 1
+  else: min_index = 1
+
+  while True:
+    unc_f = open(unc_filename)
+    run = shlex.split(command)
+    run.append(level)
+    if command[0:6] == 'zopfli':
+      run.extend(["-c",unc_filename])
+    if command[0:2] == '7z':
+      run.extend(["a","dummy","-tgzip","-si","-so"])
+    gzip_cmd = subprocess.Popen(run,stdin=unc_f,stdout=subprocess.PIPE)
+    gzip_buf = gzip_cmd.stdout.read(512)
+    gzip_hdr = gzHeader(gzip_buf)
+
+    # replace header with the original one
+    new_buf = gzhdr.raw + gzip_buf[gzip_hdr.len:]
+    new_hash = hashlib.new(HASH_TYPE)
+    new_len = 0
+    while True:
+      if len(new_buf)==0: break
+
+      new_len += len(new_buf)
+      new_hash.update(new_buf)
+      new_buf = gzip_cmd.stdout.read(BUF_SIZE)
+
+    if target_hash == new_hash.hexdigest():
+      gzhdr.level = level
+      gzhdr.command = command
+      #--rint new_hash.hexdigest(),"*","this",new_len,"old",target_len,command,level
+      return gzhdr
+
+    print new_hash.hexdigest()," ","this",new_len,"old",target_len,command,level,"not ok"
+    #--rint gzhdr.command,gzhdr.maxlevel,level,old_level
+
+    if forced_level: return None
+    new_index = None
+    if abs(new_len-target_len)<2 and command=='gzip':
+      command='gzip-1.2.4'
+      continue
+
+    if new_len == target_len: return None
+    elif (new_len < target_len):
+      if level_index > min_index:
+        new_index = level_index - 1
+    elif (new_len > target_len):
+      if level_index < max_index:
+        new_index = level_index + 1
+
+    if not new_index: return None
+    if new_index == prev_index: return None
+
+    prev_index = level_index
+    level_index = new_index
+    level = levels[level_index]
+
+def detect(f,filename):
+  fbuf=f.read(512)
+  gzhdr = gzHeader(fbuf)
+  #rint "-",filename
+
+  if gzhdr.len:
+    try:
+      unc_tmpname = None
+      (unc_tmpfd,unc_tmpname) = tempfile.mkstemp(prefix='ungz',suffix='.bin')
+      unc_file = os.fdopen(unc_tmpfd,"w")
+      decompressor=zlib.decompressobj(15|32)
+      orig_len = 0
+      unc_len = 0
+      orig_hash = hashlib.new(HASH_TYPE)
+      unc_hash = hashlib.new(HASH_TYPE)
+      while True:
+        orig_len += len(fbuf)
+        orig_hash.update(fbuf)
+        obuf=decompressor.decompress(fbuf)
+        if len(obuf)==0: break
+
+        unc_len += len(obuf)
+        unc_file.write(obuf)
+        unc_hash.update(obuf)
+        fbuf=f.read(BUF_SIZE)
+      unc_file.close()
+
+      #print orig_hash.hexdigest()," orig chunk:",orig_len-gzhdr.len
+      #print unc_hash.hexdigest()," unc",unc_len
+
+      redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len)
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-f")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-r")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-h")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.6-ubuntu --rsyncable")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.4-ubuntu --rsyncable")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.3.12-ubuntu --rsyncable")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.2.4")
+      if not redo:
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.2.4 --rsyncable")
+#      if not redo:
+#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"7z","-mx=9")
+# These are often too slow for testing
+#      if not redo:
+#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"pigz")
+#      if not redo:
+#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"pigz --rsyncable")
+#      if not redo:
+#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"zopfli","-i15")
+      os.remove(unc_tmpname)
+
+      if redo:
+        print "*",filename,redo
+      else:
+        print "-",filename,redo
+
+
+    except:
+      if unc_tmpname: os.remove(unc_tmpname)
+      raise
+
+  else:
+    print type,filename
+
+
+for fn in args.files:
+  try:
+    f=None
+    if fn=='-': f=sys.stdin
+    else: f=open(fn,'r')
+    detect(f,fn)
+  except IOError:
+    print >>sys.stderr,"ERROR - can't open %s\n"%(fn,),
+  finally:
+    if f: f.close()
