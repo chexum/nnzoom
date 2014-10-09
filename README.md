@@ -2,7 +2,9 @@ nnzoom: identify how to re-compress compressed files
 ====================================================
 
 In an effort to store things uncompressed (to make best use of deduplication),
-nnzoom tries to find out how to get the same binary stream.
+nnzoom tries to find out how to get the same binary stream.  It can also be
+used to allow storing the archives with this year's compression, while still
+being able to re-create the original archive to check a signature provided.
 
 Sometimes it is trivial - just the right header options need to be re-created,
 timestamp and/or filename, though the stored filename may be somethign you
@@ -41,3 +43,4 @@ TODO
 - older "libatomic_ops" and "gc" tarballs use a too good compression which is not pigz/zopfli/7z
 - Older "libz" likewise (wonder why?)
 - Check if BSD is really using zlib which I called minigzip
+- Actually re-create the original archive based on the output
