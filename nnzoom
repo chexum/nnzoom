@@ -22,7 +22,7 @@
 #                                03 (03 = Unix)
 #                                   xx (zstring name if)
 
-# The GNU gzip output differs between 1.2.14 (up to at least 1.3.13) and 1.6 (from 1.5 at least)
+# The GNU gzip output differs between 1.2.14 (up to at least 1.4) and 1.6 (from 1.5 at least)
 # All the --rsyncable output differs for each Ubuntu patch at least
 #
 # Event-0.51.tar.gz *gzip-1.2.4 -3 2a6fb837786dc6ebfe0325d92fd76710ec027a66 61260
@@ -161,7 +161,7 @@ def retry_gz(gzhdr,unc_filename,target_hash,target_len,command="gzip",forced_lev
     if forced_level: return None
     new_index = None
     if abs(new_len-target_len)<2 and command=='gzip':
-      command='gzip-1.2.4'
+      command='gzip-1.4'
       continue
 
     if new_len == target_len: return None
@@ -225,9 +225,7 @@ def detect(f,filename):
       if not redo:
         redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.3.12-ubuntu --rsyncable")
       if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.2.4")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.2.4 --rsyncable")
+        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.4")
 #      if not redo:
 #        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"7z","-mx=9")
 # These are often too slow for testing
