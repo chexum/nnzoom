@@ -79,9 +79,10 @@ class gzHeader:
       self.len = 10
       # FLG.FEXTRA - extra field presents, with le16 length
       if (flg&4) != 0:
+        extralen = struct.unpack_from("<H",buf[self.len:self.len+2])[0]
         self.len += 2
-        extralen = struct.unpack_from("<H",buf[self.len:self.len+2])
-        self.extra = buf[self.len:self.len+extralen]
+        # rfc1952 specifies the contents of this too
+        self.extra = "".join(b.encode('hex') for b in buf[self.len:self.len+extralen])
         self.len += extralen
       # FLG.FNAME - original file name, zero byte terminated
       if (flg&8) != 0:
