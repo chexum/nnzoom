@@ -40,6 +40,7 @@ TODO
 ====
 
 - Other compression tools (bzip2, xz)
+- Keep a partial hash of the uncompressed file to stop earlier if it's not a match
 - older "libatomic_ops" and "gc" tarballs use a too good compression which is not pigz/zopfli/7z
 - Older "libz" likewise (wonder why?)
 - Check if BSD is really using zlib which I called minigzip
