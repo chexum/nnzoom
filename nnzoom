@@ -93,7 +93,7 @@ class gzHeader:
         commentlen = buf[self.len:].index(b'\0')
         self.comment = buf[self.len:self.len+commentlen]
         self.len += commentlen+1
-      if (flg&4) != 0:
+      if (flg&2) != 0:
         self.hdrcrc = struct.unpack_from("<H",buf[self.len:self.len+2])[0]
         self.len += 2
 
