@@ -183,7 +183,7 @@ def retry_gz(gzhdr,unc_filename,target_hash,target_len,command="gzip",forced_lev
 def detect(f,filename):
   fbuf=f.read(512)
   gzhdr = gzHeader(fbuf)
-  #rint "-",filename
+  #rint "-",filename,gzhdr
 
   if gzhdr.len:
     try:
