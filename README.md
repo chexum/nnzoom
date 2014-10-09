@@ -26,12 +26,18 @@ different bitstreams, and not everytime the official GNU sources.
 Currently supported
 -------------------
 
-- deflate with "gzip" with any versions.  Many of the "--rsyncable" patches
+- Deflate with "gzip" with any versions.  Many of the "--rsyncable" patches
   provide slightly different bitstreams, so ideally, these need to be kept as a
-  separate executable.  Also gzip 1.2.4 sometimes compressed the final bytes differently.
+  separate executable.  Also gzip 1.2.4 sometimes compressed the final bytes
+  differently.
+- Deflate with "minigzip" and/or a zlib based tool.
+- Deflate with "pigz", which has rsyncable as an option by default.
+- As a test, "zopfli", and "7z -tgzip"
 
-- deflate with "minigzip" and/or a zlib based tool.
+TODO
+====
 
-- deflate with "pigz", which has rsyncable as an option by default.
-
-- as a test, "zopfli", and "7z -tgzip"
+- Other compression tools (bzip2, xz)
+- older "libatomic_ops" and "gc" tarballs use a too good compression which is not pigz/zopfli/7z
+- Older "libz" likewise (wonder why?)
+- Check if BSD is really using zlib which I called minigzip
