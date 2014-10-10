@@ -59,6 +59,7 @@ class gzHeader:
     self.hdrcrc=None
     self.command=None
     self.complevel="-6"
+    self.padlen=0
 
     # minimum file length (10+crc+origsize)
     if len(buf)<18:
@@ -104,11 +105,20 @@ class gzHeader:
 
   def __repr__(self):
     if self.magic:
-      return json.dumps({self.command:[
+      if self.padlen:
+        return json.dumps({self.command:[
         self.level,
         self.magic,
         self.method,self.flags,self.stamp,self.extraflags,self.ostype,
-        self.extra,self.name,self.comment,self.hdrcrc]})
+        self.extra,self.name,self.comment,self.hdrcrc,
+        self.padlen]})
+      else:
+        return json.dumps({self.command:[
+        self.level,
+        self.magic,
+        self.method,self.flags,self.stamp,self.extraflags,self.ostype,
+        self.extra,self.name,self.comment,self.hdrcrc,
+        ]})
     return json.dumps(None)
 
 def retry_gz(gzhdr,unc_filename,target_hash,target_len,command="gzip",forced_level=None):
@@ -141,8 +151,12 @@ def retry_gz(gzhdr,unc_filename,target_hash,target_len,command="gzip",forced_lev
     new_buf = gzhdr.raw + gzip_buf[gzip_hdr.len:]
     new_hash = hashlib.new(HASH_TYPE)
     new_len = 0
+    pad_len = gzhdr.padlen
     while True:
-      if len(new_buf)==0: break
+      if len(new_buf)==0:
+        if pad_len == 0: break
+        new_buf = b'\0'*pad_len
+        pad_len = 0
 
       new_len += len(new_buf)
       new_hash.update(new_buf)
@@ -204,6 +218,10 @@ def detect(f,filename):
         unc_hash.update(obuf)
         fbuf=f.read(BUF_SIZE)
       unc_file.close()
+
+      # quick hack to verify - might need the actual pad to match the binary
+      if len(decompressor.unused_data):
+        gzhdr.padlen=len(decompressor.unused_data)
 
       #print orig_hash.hexdigest()," orig chunk:",orig_len-gzhdr.len
       #print unc_hash.hexdigest()," unc",unc_len
