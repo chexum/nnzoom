@@ -222,6 +222,8 @@ def detect(f,filename):
       # quick hack to verify - might need the actual pad to match the binary
       if len(decompressor.unused_data):
         gzhdr.padlen=len(decompressor.unused_data)
+        if gzhdr.padlen >= 8192 or gzhdr.padlen >= orig_len:
+          print >>sys.stderr,"WARNING - pad may be too large for {} ({})".format(fn,gzhdr.padlen)
 
       #print orig_hash.hexdigest()," orig chunk:",orig_len-gzhdr.len
       #print unc_hash.hexdigest()," unc",unc_len
