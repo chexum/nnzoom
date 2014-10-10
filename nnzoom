@@ -22,13 +22,11 @@
 #                                03 (03 = Unix)
 #                                   xx (zstring name if)
 
-# The GNU gzip output differs between 1.2.14 (up to at least 1.4) and 1.6 (from 1.5 at least)
-# All the --rsyncable output differs for each Ubuntu patch at least
-#
-# Event-0.51.tar.gz *gzip-1.2.4 -3 2a6fb837786dc6ebfe0325d92fd76710ec027a66 61260
-# Event-0.51.tar.gz *gzip-1.6   -3 a96abdc40ddf63649344150cb5c21330a637a216 61260 !
-# Event-0.51.tar.gz *gzip-1.2.4 -9 d29a06cf9fec8dd7d697713d1cfc23202c7d1ad2 55125
-# Event-0.51.tar.gz *gzip-1.6   -9 0598c87cddcde1910cf3be4169ddd43199fcb4be 55124
+# Bad news - older gzip output is inherently non-reproducible:
+# 0a284baeaedca68017f46d2646e4c921aa98a90d "gzip: fix nondeterministic compression results"
+# This is the only real code change to the deflate function in GNU gzip, it was
+# made soon after the 1.4 release, which means everything up to 1.4 is affected by it.
+# There's no real way to deal with it, but to record the last few bytes of the deflated stream.
 
 import argparse
 import sys

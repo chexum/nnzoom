@@ -30,8 +30,7 @@ Currently supported
 
 - Deflate with "gzip" with any versions.  Many of the "--rsyncable" patches
   provide slightly different bitstreams, so ideally, these need to be kept as a
-  separate executable.  Also gzip 1.2.4 sometimes compressed the final bytes
-  differently.
+  separate executable.
 - Deflate with "minigzip" and/or a zlib based tool.
 - Deflate with "pigz", which has rsyncable as an option by default.
 - As a test, "zopfli", and "7z -tgzip"
