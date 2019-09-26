@@ -230,31 +230,19 @@ def detect(f,filename):
       #print unc_hash.hexdigest()," unc",unc_len
 
       redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len)
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-f")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-r")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-h")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.6-ubuntu --rsyncable")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.4-ubuntu --rsyncable")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.3.12-ubuntu --rsyncable")
-      if not redo:
-        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.4")
-#      if not redo:
-#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"7z","-mx=9")
+      if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip")
+#     if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-f")
+#     if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-r")
+#     if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"minigzip","-h")
+      if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.6-ubuntu --rsyncable")
+      if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.4-ubuntu --rsyncable")
+      if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.3.12-ubuntu --rsyncable")
+      if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"gzip-1.4")
 # These are often too slow for testing
-#      if not redo:
-#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"pigz")
-#      if not redo:
-#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"pigz --rsyncable")
-#      if not redo:
-#        redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"zopfli","-i15")
+#     if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"7z","-mx=9")
+#     -M1|-b256
+      if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"pigz")
+#     if not redo: redo = retry_gz(gzhdr,unc_tmpname,orig_hash.hexdigest(),orig_len,"zopfli","-i15")
       os.remove(unc_tmpname)
 
       if redo:
