@@ -3,9 +3,10 @@
 # Theory of operation:
 #
 # save header from file to identify
-# re-compress uncompressed data
+# re-compress uncompressed data, finding a compressor to produce the same bitstream
 # strip header for re-compressed data
 # add header from old compressed data
+# result: tool version + header / trailer = exact compressed file
 
 import argparse
 import sys
@@ -24,7 +25,7 @@ args = parser.parse_args()
 # bzip2-1.0.6.tar.gz- gzip compressed data, was "bzip2-1.0.6.tar", from Unix, last modified: Mon Sep 20 08:15:13 2010
 # 0000000: 1f8b 0808 010a 974c 0003 627a 6970 322d  .......L..bzip2-
 # 0000010: 312e 302e 362e 7461 7200 ec3c 6b57 1b47  1.0.6.tar..<kW.G
-# 0000020: b2f9 7af9 156d 7292 6890 8435 2310 3832  ..z..mr.h..5#.82  
+# 0000020: b2f9 7af9 156d 7292 6890 8435 2310 3832  ..z..mr.h..5#.82
 #
 #          1f8b - id
 #               08 - deflate
@@ -35,12 +36,36 @@ args = parser.parse_args()
 #                              00 (02: max compression, 04: max speed)
 #                                03 (03 = Unix)
 #                                   xx (zstring name if)
+#                                   .
+#                                   ec3c... start of deflate data
+# $ zcat bzip2-1.0.6.tar.gz|gzip -6|tail +11c|md5sum
+# 46900069cd98574e13e5c40a9a7d0bf9  -
+# $ tail +27c bzip2-1.0.6.tar.gz|md5sum
+# 46900069cd98574e13e5c40a9a7d0bf9  -
+# $ head -26c <bzip2-1.0.6.tar.gz|xxd
+# 0000000: 1f8b 0808 010a 974c 0003 627a 6970 322d  .......L..bzip2-
+# 0000010: 312e 302e 362e 7461 7200                 1.0.6.tar.
+#
 
 # Bad news - older gzip output is inherently non-reproducible:
 # 0a284baeaedca68017f46d2646e4c921aa98a90d "gzip: fix nondeterministic compression results"
 # This is the only real code change to the deflate function in GNU gzip, it was
 # made soon after the 1.4 release, which means everything up to 1.4 is affected by it.
-# There's no real way to deal with it, but to record the last few bytes of the deflated stream.
+# In many cases, this is the difference between 1.4 and 1.5+, but sometimes even
+# 1.4 cannot reproduce its own output without being given the state from previous files.
+# There's no nice way to deal with it, but to record the last few bytes of the deflated stream.
+# The good news is that when this is implemented, perhaps there won't be a need
+# for keeping gzip 1.4 around.
+
+# diff -u <(zcat cdb-0.75.tar.gz|gzip -9 |tail +11c|xxd) <(tail +24c <cdb-0.75.tar.gz|xxd)
+#  000d330: f560 6e40 1fb7 ba47 16ad 4619 9e3f e70c  .`n@...G..F..?..
+#  000d340: c8bf 374d 10a5 9521 8a2b 4338 1fa9 deaa  ..7M...!.+C8....
+#  000d350: 4d7f 5cfc c435 8aef ee09 670d ed5a bdef  M.\..5....g..Z..
+# -000d360: cac6 9ec8 b4a4 ec5f f62f fb97 fdfb f9fe  ......._./......
+# -000d370: fd3f f6a5 6768 00ae 0200                 .?..gh....
+#                ^-crc32-^ ^-isize-^
+# +000d360: cac6 9ec8 b4a4 ec5f f62f fb97 fdfb f9f4  ......._./......
+# +000d370: bfff 07f6 a567 6800 ae02 00              .....gh....
 
 
 # pass enough of buf for all the header please
