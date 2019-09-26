@@ -108,17 +108,17 @@ class gzHeader:
     if self.magic:
       if self.padlen:
         return json.dumps({self.command:[
-        self.level,
-        self.magic,
-        self.method,self.flags,self.stamp,self.extraflags,self.ostype,
-        self.extra,self.name,self.comment,self.hdrcrc,
-        self.padlen]})
+          self.level,
+          self.magic,
+          self.method,self.flags,self.stamp,self.extraflags,self.ostype,
+          self.extra,self.name,self.comment,self.hdrcrc,
+          self.padlen]})
       else:
         return json.dumps({self.command:[
-        self.level,
-        self.magic,
-        self.method,self.flags,self.stamp,self.extraflags,self.ostype,
-        self.extra,self.name,self.comment,self.hdrcrc,
+          self.level,
+          self.magic,
+          self.method,self.flags,self.stamp,self.extraflags,self.ostype,
+          self.extra,self.name,self.comment,self.hdrcrc,
         ]})
     return json.dumps(None)
 
