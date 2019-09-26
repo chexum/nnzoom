@@ -2,10 +2,24 @@
 
 # Theory of operation:
 #
-# save gzip header from file to identify
+# save header from file to identify
 # re-compress uncompressed data
 # strip header for re-compressed data
 # add header from old compressed data
+
+import argparse
+import sys
+import tempfile
+import json,struct
+import zlib,hashlib
+import subprocess,os,shlex
+
+HASH_TYPE='md5'
+BUF_SIZE=64000
+
+parser = argparse.ArgumentParser(description='Identify compression.')
+parser.add_argument('files',nargs='+',type=str)
+args = parser.parse_args()
 
 # bzip2-1.0.6.tar.gz- gzip compressed data, was "bzip2-1.0.6.tar", from Unix, last modified: Mon Sep 20 08:15:13 2010
 # 0000000: 1f8b 0808 010a 974c 0003 627a 6970 322d  .......L..bzip2-
@@ -28,19 +42,6 @@
 # made soon after the 1.4 release, which means everything up to 1.4 is affected by it.
 # There's no real way to deal with it, but to record the last few bytes of the deflated stream.
 
-import argparse
-import sys
-import tempfile
-import json,struct
-import zlib,hashlib
-import subprocess,os,shlex
-
-HASH_TYPE='md5'
-BUF_SIZE=64000
-
-parser = argparse.ArgumentParser(description='Identify compression.')
-parser.add_argument('files',nargs='+',type=str)
-args = parser.parse_args()
 
 # pass enough of buf for all the header please
 class gzHeader:
